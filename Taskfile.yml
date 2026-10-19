@@ -1,0 +1,61 @@
+version: "3"
+
+vars:
+  INTERVAL: 15 # seconds between clicks
+  JITTER: 2 # random +/- seconds
+  DELAY: 5 # countdown to park the mouse on "Next"
+  STEP: 5 # seconds changed per -/= hotkey press
+
+tasks:
+  default:
+    desc: Start clicking (override e.g. `task INTERVAL=45`)
+    cmds:
+      - task: run
+
+  run:
+    desc: "Start clicking. Keys: -/= faster/slower, F8 click now, F9 pause, F10 quit"
+    cmds:
+      - uv run realestate-clicker --interval {{.INTERVAL}} --jitter {{.JITTER}} --delay {{.DELAY}} --step {{.STEP}} {{.CLI_ARGS}}
+
+  fast:
+    desc: Click every 15s
+    cmds:
+      - task: run
+        vars: { INTERVAL: 15 }
+
+  slow:
+    desc: Click every 60s
+    cmds:
+      - task: run
+        vars: { INTERVAL: 60 }
+
+  test:
+    desc: Single click after the countdown, to check it works
+    cmds:
+      - uv run realestate-clicker --delay {{.DELAY}} --max-clicks 1
+
+  setup:
+    desc: One-time setup - install deps and grant access to /dev/uinput + keyboards (needs sudo, then log out/in)
+    cmds:
+      - uv sync
+      - echo 'KERNEL=="uinput", GROUP="input", MODE="0660", OPTIONS+="static_node=uinput"' | sudo tee /etc/udev/rules.d/99-uinput.rules
+      - echo uinput | sudo tee /etc/modules-load.d/uinput.conf
+      - sudo modprobe uinput
+      - sudo udevadm control --reload-rules
+      - sudo udevadm trigger --name-match=uinput
+      - sudo usermod -aG input $USER
+      - echo "Done. Log out and back in (or reboot) so the 'input' group takes effect."
+
+  awake:
+    desc: Stop GNOME from dimming/locking the screen
+    cmds:
+      - gsettings set org.gnome.desktop.session idle-delay 0
+      - gsettings set org.gnome.desktop.screensaver lock-enabled false
+      - gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing'
+
+  restore:
+    desc: Restore GNOME screen dim/lock defaults
+    cmds:
+      - gsettings reset org.gnome.desktop.session idle-delay
+      - gsettings reset org.gnome.desktop.screensaver lock-enabled
+      - gsettings reset org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type
